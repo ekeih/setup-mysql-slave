@@ -1,0 +1,99 @@
+---
+
+- hosts: "{{ master }}"
+  tasks:
+    - name: create temporary backup directory on master
+      tempfile:
+        state: directory
+        prefix: ansible-
+        suffix: .mysqlslave
+      register: backupdir
+    - name: dump database from master
+      shell: "innobackupex --no-timestamp {{ backupdir.path }}/dump 2>&1 | tail -n 1"
+      register: innobackupex
+      failed_when: '"completed OK!" not in innobackupex.stdout'
+    - name: apply log to database dump
+      shell: "innobackupex --apply-log {{ backupdir.path }}/dump 2>&1 | tail -n 1"
+      register: apply_log
+      failed_when: '"completed OK!" not in apply_log.stdout'
+    - name: compress database dump
+      archive:
+        path: "{{ backupdir.path }}/dump/"
+        dest: "{{ backupdir.path }}/dump.tar.gz"
+        format: gz
+        owner: root
+        group: root
+        mode: 0600
+        remove: yes
+    - name: create temporary directory on localhost
+      delegate_to: localhost
+      tempfile:
+        state: directory
+        prefix: ansible-
+        suffix: .mysqlslave
+      register: local_tmp
+    - name: download database dump from master
+      fetch:
+        src: "{{ backupdir.path }}/dump.tar.gz"
+        dest: "{{ local_tmp.path }}"
+        flat: yes
+    - name: remove database dump from master
+      file:
+        path: "{{ backupdir.path }}"
+        state: absent
+
+- hosts: "{{ slave }}"
+  tasks:
+    - name: stop MySQL on slave
+      service:
+        name: mysql
+        state: stopped
+    - name: delete slave data
+      file:
+        path: /var/lib/mysql
+        state: absent
+    - name: create /var/lib/mysql
+      file:
+        path: /var/lib/mysql
+        state: directory
+        owner: mysql
+        group: mysql
+        mode: 0750
+    - name: uncompress database dump
+      unarchive:
+        src: "{{ hostvars[master].local_tmp.path }}/dump.tar.gz"
+        dest: /var/lib/mysql
+        owner: mysql
+        group: mysql
+    - name: start MySQL on slave
+      service:
+        name: mysql
+        state: started
+    - name: get binlog file
+      command: 'sed -r "s/^(.*)\s[0-9]+$/\1/" /var/lib/mysql/xtrabackup_binlog_pos_innodb'
+      args:
+        warn: no
+      register: binlog_file
+    - name: get binlog position
+      command: 'sed -r "s/^.*\s([0-9]+)$/\1/" /var/lib/mysql/xtrabackup_binlog_pos_innodb'
+      args:
+        warn: no
+      register: binlog_position
+    - name: configure MySQL slave process
+      mysql_replication:
+        master_host: "{{ mysql_replication_master | default(master) }}"
+        master_user: "{{ mysql_replication_user }}"
+        master_password: "{{ mysql_replication_password }}"
+        master_log_file: "{{ binlog_file.stdout }}"
+        master_log_pos: "{{ binlog_position.stdout }}"
+        master_ssl: 1
+        master_ssl_capath: /etc/ssl/certs
+        mode: changemaster
+    - name: start MySQL slave process
+      mysql_replication:
+        mode: startslave
+    - name: remove database dump from localhost
+      delegate_to: localhost
+      file:
+        path: "{{ hostvars[master].local_tmp.path }}"
+        state: absent
