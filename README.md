@@ -39,5 +39,5 @@ WARNING: This playbook will delete all previous data from the MySQL slave!
 Assuming that you defined `mysql_replication_user` and `mysql_replication_password` in your host_vars you can simply run:
 
 ```
-ansible-playbook playbooks/setup_mysql_slave/main.yml -e 'master=master.exmaple.com slave=slave.example.com'
+ansible-playbook main.yml -e 'master=master.exmaple.com slave=slave.example.com'
 ```
