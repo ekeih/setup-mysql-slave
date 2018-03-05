@@ -9,11 +9,13 @@
         suffix: .mysqlslave
       register: backupdir
     - name: dump database from master
-      shell: "innobackupex --no-timestamp {{ backupdir.path }}/dump 2>&1 | tail -n 1"
+      shell: >-
+        innobackupex --no-timestamp {{ backupdir.path }}/dump 2>&1 | tail -n 1
       register: innobackupex
       failed_when: '"completed OK!" not in innobackupex.stdout'
     - name: apply log to database dump
-      shell: "innobackupex --apply-log {{ backupdir.path }}/dump 2>&1 | tail -n 1"
+      shell: >-
+        innobackupex --apply-log {{ backupdir.path }}/dump 2>&1 | tail -n 1
       register: apply_log
       failed_when: '"completed OK!" not in apply_log.stdout'
     - name: compress database dump
@@ -70,12 +72,16 @@
         name: mysql
         state: started
     - name: get binlog file
-      command: 'sed -r "s/^(.*)\s[0-9]+$/\1/" /var/lib/mysql/xtrabackup_binlog_pos_innodb'
+      command: >-
+        sed -r 's/^(.*)\s[0-9]+$/\1/'
+        /var/lib/mysql/xtrabackup_binlog_pos_innodb
       args:
         warn: false
       register: binlog_file
     - name: get binlog position
-      command: 'sed -r "s/^.*\s([0-9]+)$/\1/" /var/lib/mysql/xtrabackup_binlog_pos_innodb'
+      command: >-
+        sed -r \"s/^.*\s([0-9]+)$/\1/\"
+        /var/lib/mysql/xtrabackup_binlog_pos_innodb
       args:
         warn: false
       register: binlog_position
