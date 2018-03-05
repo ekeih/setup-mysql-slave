@@ -24,7 +24,7 @@
         owner: root
         group: root
         mode: 0600
-        remove: yes
+        remove: true
     - name: create temporary directory on localhost
       delegate_to: localhost
       tempfile:
@@ -36,7 +36,7 @@
       fetch:
         src: "{{ backupdir.path }}/dump.tar.gz"
         dest: "{{ local_tmp.path }}"
-        flat: yes
+        flat: true
     - name: remove database dump from master
       file:
         path: "{{ backupdir.path }}"
@@ -72,12 +72,12 @@
     - name: get binlog file
       command: 'sed -r "s/^(.*)\s[0-9]+$/\1/" /var/lib/mysql/xtrabackup_binlog_pos_innodb'
       args:
-        warn: no
+        warn: false
       register: binlog_file
     - name: get binlog position
       command: 'sed -r "s/^.*\s([0-9]+)$/\1/" /var/lib/mysql/xtrabackup_binlog_pos_innodb'
       args:
-        warn: no
+        warn: false
       register: binlog_position
     - name: configure MySQL slave process
       mysql_replication:
