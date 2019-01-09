@@ -37,7 +37,7 @@
     - name: download database dump from master
       fetch:
         src: "{{ backupdir.path }}/dump.tar.gz"
-        dest: "{{ local_tmp.path }}"
+        dest: "{{ local_tmp.path }}/"
         flat: true
     - name: remove database dump from master
       file:
@@ -80,7 +80,7 @@
       register: binlog_file
     - name: get binlog position
       command: >-
-        sed -r \"s/^.*\s([0-9]+)$/\1/\"
+        sed -r 's/^.*\s([0-9]+)$/\1/'
         /var/lib/mysql/xtrabackup_binlog_pos_innodb
       args:
         warn: false
